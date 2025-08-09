@@ -267,3 +267,7 @@ document.getElementById('recenter').onclick = ()=>{
 loadReports();
 document.getElementById('start').value = 'Paris';
 document.getElementById('end').value = 'Lyon';
+
+// Ensure Leaflet resizes correctly on orientation/resize
+window.addEventListener('resize', ()=> { setTimeout(()=> map.invalidateSize(), 150); });
+setTimeout(()=> map.invalidateSize(), 300);
