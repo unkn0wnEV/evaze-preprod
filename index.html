@@ -18,7 +18,7 @@
   <div class="status">
     <span id="onlineStatus"></span>
   </div>
-  <div class="status"><span class="badge">v0.3.2-preprod</span> build 2025-08-09 09:52</div>
+  <div class="status"><span class="badge">v0.4.0-preprod</span> build 2025-08-09 10:00</div>
 </header>
 
 
@@ -43,7 +43,8 @@
 
   <div class="panel">
     <h2>Véhicule</h2>
-    <div class="grid">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input id="plate" placeholder="Immatriculation (ex: AB-123-CD)" style="flex:1"/><button id="fetchVehicle" class="accent">Récupérer véhicule</button></div>
+<div class="grid">
       <label>Capacité (kWh)</label><input id="capacity" type="number" min="10" max="150" step="1" value="50"/>
       <label>SoC actuel (%)</label><input id="soc" type="number" min="1" max="100" step="1" value="80"/>
       <label>Conso (kWh/100km)</label><input id="consumption" type="number" min="8" max="30" step="0.1" value="15.0"/>
@@ -69,12 +70,9 @@
 
 <div class="map-wrap"><div id="map"></div></div>
 
-<div id="sidebar">
-  <h2>Bornes le long de la route</h2>
-  <div id="chargersList"></div>
-</div>
+<div id="bottomSheet" class="half"><div id="sheetHandle"></div><div id="bottomTitle"><h2 style="margin:0">Bornes le long de la route</h2><div><button id="collapseSheet" class="ghost">▼</button> <button id="expandSheet" class="ghost">▲</button></div></div><div id="chargersList"></div></div>
 
-<div class="fab">
+<div class="map-controls">
   <button id="recenter" class="accent">📍 Recentrer</button>
 </div>
 
