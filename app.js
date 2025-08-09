@@ -160,7 +160,7 @@ function listChargersNearRoute(r){
     card.innerHTML = `<b>${c.name}</b> <span class="badge">${c.dist.toFixed(1)} km</span><br>
     ${c.operator} • ${c.power} kW • ${c.price}<br>
     <button onclick="centerOn(${c.lat}, ${c.lng})">Voir</button>
-    <button onclick="addStop('${c.id}')" class="accent">Ajouter comme arrêt</button>`;
+    <button onclick="addStop('${c.id}')" class="accent">Choisir pour ce trajet</button>`;
     list.appendChild(card);
   });
 }
@@ -271,3 +271,155 @@ document.getElementById('end').value = 'Lyon';
 // Ensure Leaflet resizes correctly on orientation/resize
 window.addEventListener('resize', ()=> { setTimeout(()=> map.invalidateSize(), 150); });
 setTimeout(()=> map.invalidateSize(), 300);
+
+// --- Vehicle lookup by license plate (mock) ---
+// In production, plug a real API endpoint here (e.g., car vertical, VIN decode, or national registry via a provider)
+const MOCK_VEHICLES = {
+  "AB-123-CD": { make:"Peugeot", model:"e-208 GT", year:2022, battery_kwh:50, usable_kwh:46.3, typical_cons_kwh_100:15.5, fast_charge_kw:100 },
+  "CD-456-EF": { make:"Renault", model:"Megane E-Tech EV60", year:2023, battery_kwh:60, usable_kwh:60, typical_cons_kwh_100:16.8, fast_charge_kw:130 },
+  "ZZ-999-AA": { make:"Tesla", model:"Model 3 RWD LFP", year:2024, battery_kwh:57.5, usable_kwh:57.5, typical_cons_kwh_100:14.5, fast_charge_kw:170 }
+};
+
+async function lookupVehicleByPlate(plate){
+  // Normalize plate (very naive)
+  const key = plate.trim().toUpperCase();
+  // Demo: local mock
+  if(MOCK_VEHICLES[key]) return { source:'mock', ...MOCK_VEHICLES[key] };
+
+  // Hook for future API:
+  // const resp = await fetch('https://your-api/lookup?plate='+encodeURIComponent(key));
+  // if(resp.ok) return await resp.json();
+
+  return null;
+}
+
+document.getElementById('fetchVehicle').onclick = async ()=>{
+  const plate = document.getElementById('plate').value;
+  if(!plate){ toast("Entre une immatriculation (ex: AB-123-CD)"); return; }
+  document.getElementById('planSummary').textContent = 'Recherche véhicule…';
+  const info = await lookupVehicleByPlate(plate);
+  if(!info){ toast("Véhicule introuvable (demo)."); document.getElementById('planSummary').textContent=''; return; }
+  // Prefill fields
+  document.getElementById('capacity').value = info.usable_kwh ?? info.battery_kwh ?? 50;
+  document.getElementById('consumption').value = info.typical_cons_kwh_100 ?? 15.0;
+  // Small summary
+  document.getElementById('planSummary').innerHTML = `Véhicule détecté: <b>${info.make} ${info.model}</b> ${info.year || ''} • Batterie utilisable ~ <b>${(info.usable_kwh||info.battery_kwh)} kWh</b>`;
+  toast(`Profil chargé: ${info.make} ${info.model}`);
+};
+
+// --- Bottom sheet drag/controls ---
+(function(){
+  const sheet = document.getElementById('bottomSheet');
+  const handle = document.getElementById('sheetHandle');
+  const btnDown = document.getElementById('collapseSheet');
+  const btnUp = document.getElementById('expandSheet');
+  const states = {collapsed:64, half: window.innerHeight*0.40, full: window.innerHeight*0.85};
+  let current = 'half', startY=0, startH=states.half, dragging=false;
+
+  function setState(s){
+    current = s;
+    sheet.classList.remove('collapsed','full');
+    if(s==='collapsed'){ sheet.classList.add('collapsed'); sheet.style.height = states.collapsed+'px'; }
+    else if(s==='full'){ sheet.classList.add('full'); sheet.style.height = states.full+'px'; }
+    else { sheet.style.height = states.half+'px'; }
+    setTimeout(()=> map.invalidateSize(), 150);
+  }
+  setState('half');
+
+  function onStart(y){ dragging=true; startY=y; startH=parseFloat(getComputedStyle(sheet).height); }
+  function onMove(y){
+    if(!dragging) return;
+    const dy = startY - y;
+    const nh = Math.max(64, Math.min(window.innerHeight*0.9, startH + dy));
+    sheet.style.height = nh+'px';
+  }
+  function onEnd(){
+    if(!dragging) return;
+    dragging=false;
+    const h = parseFloat(getComputedStyle(sheet).height);
+    const mid = window.innerHeight*0.40;
+    const top = window.innerHeight*0.70;
+    if(h < 100) setState('collapsed');
+    else if(h < top) setState('half');
+    else setState('full');
+  }
+
+  handle.addEventListener('mousedown', (e)=>onStart(e.clientY));
+  window.addEventListener('mousemove', (e)=> onMove(e.clientY));
+  window.addEventListener('mouseup', onEnd);
+  handle.addEventListener('touchstart', (e)=> onStart(e.touches[0].clientY), {passive:true});
+  window.addEventListener('touchmove', (e)=> onMove(e.touches[0].clientY), {passive:true});
+  window.addEventListener('touchend', onEnd);
+  btnDown.onclick = ()=> setState('collapsed');
+  btnUp.onclick = ()=> setState('full');
+  window.addEventListener('resize', ()=>{
+    states.half = window.innerHeight*0.40;
+    states.full = window.innerHeight*0.85;
+    if(current==='half') sheet.style.height = states.half+'px';
+    if(current==='full') sheet.style.height = states.full+'px';
+  });
+})();
+
+// --- Smart charger selection + charge time estimate ---
+let selectedChargerId = null;
+function selectCharger(id){
+  selectedChargerId = id;
+  const c = chargers.find(x=>x.id===id);
+  if(!c) return;
+  toast(`Borne sélectionnée: ${c.name}`);
+  estimateChargeTime(c);
+}
+
+function vehicleSpec(){
+  const cap = parseFloat(document.getElementById('capacity').value || '50'); // usable kWh assumed
+  const soc = parseFloat(document.getElementById('soc').value || '80');
+  const cons = parseFloat(document.getElementById('consumption').value || '15');
+  const reserve = parseFloat(document.getElementById('reserve').value || '10');
+  // fast charge capability from mock profile if present
+  let carKw = 100;
+  try{
+    // if we have a note in planSummary from lookup, try to infer model; fallback 100kW
+    const txt = document.getElementById('planSummary').textContent || '';
+    if(txt.includes('Model 3')) carKw = 170;
+    if(txt.includes('e-208')) carKw = 100;
+    if(txt.includes('Megane')) carKw = 130;
+  }catch(e){}
+  return {cap, soc, cons, reserve, carKw};
+}
+
+function estimateChargeTime(charger){
+  if(!window.lastRoute){ document.getElementById('planSummary').textContent = 'Trace d’abord un itinéraire.'; return; }
+  const {cap, soc, cons, reserve, carKw} = vehicleSpec();
+  const usable = cap * (soc/100 - reserve/100); // kWh utilisables avant réserve
+  const range_km = (usable / cons) * 100.0;
+  const dist = window.lastRoute.distance_km;
+  const missing_km = Math.max(0, dist - range_km);
+
+  if(missing_km <= 1){
+    document.getElementById('planSummary').innerHTML = `Autonomie OK sans recharge. Borne sélectionnée: <b>${charger.name}</b> (facultatif).`;
+    return;
+  }
+
+  // Energy needed to finish trip (10% overhead)
+  const energy_needed_kWh = (missing_km * cons / 100) * 1.10;
+
+  // Charging power limited by car & station; average power ~60% to account for taper
+  const stationKw = charger.power || 100;
+  const peakKw = Math.min(stationKw, carKw);
+  const avgKw = peakKw * 0.60;
+  const time_h = energy_needed_kWh / Math.max(20, avgKw); // avoid unrealistically low
+  const minutes = Math.max(7, Math.round(time_h * 60));
+
+  // Where to stop? naive: charger nearest to mid-point of route (already in list)
+  document.getElementById('planSummary').innerHTML =
+    `Trajet: <b>${dist.toFixed(1)} km</b> • Manque ~<b>${missing_km.toFixed(0)} km</b>.<br>` +
+    `Arrêt recommandé: <b>${charger.name}</b> (${charger.operator}, ${charger.power} kW).<br>` +
+    `⏱️ Temps de recharge estimé: <b>${minutes} min</b> (moy. ~${Math.round(avgKw)} kW).`;
+}
+
+// override addStop to also select & estimate
+const _oldAddStop = window.addStop;
+window.addStop = function(id){
+  if(typeof _oldAddStop === 'function'){ _oldAddStop(id); }
+  selectCharger(id);
+};
