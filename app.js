@@ -64,6 +64,8 @@ async function makeRoute(){
   if(!data.routes || !data.routes[0]) return null;
   const route = data.routes[0];
   if(routeLine) map.removeLayer(routeLine);
+  document.getElementById('map').style.display='block';
+  setTimeout(()=> map.invalidateSize(), 100);
   routeLine = L.geoJSON(route.geometry, {style:{weight:6, opacity:.9}}).addTo(map);
   map.fitBounds(routeLine.getBounds());
   window.lastRoute = {
@@ -102,6 +104,8 @@ document.getElementById('routeBtn').onclick = async ()=>{
   if(!startMarker || !endMarker){ toast('Renseigne départ et arrivée.'); return; }
   document.getElementById('planSummary').textContent = 'Calcul de l’itinéraire…';
   const r = await makeRoute();
+  document.getElementById('map').style.display='block';
+  setTimeout(()=> map.invalidateSize(), 100);
   if(!r){ toast('Pas de route trouvée.'); }
 };
 
@@ -121,6 +125,8 @@ document.getElementById('planBtn').onclick = async ()=>{
     await ensureMarkersFromInputs();
     if(!startMarker || !endMarker){ toast('Trace d’abord un itinéraire.'); document.getElementById('planSummary').textContent=''; return; }
     await makeRoute();
+  document.getElementById('map').style.display='block';
+  setTimeout(()=> map.invalidateSize(), 100);
   }
   const cap = parseFloat(document.getElementById('capacity').value || '50');
   const soc = parseFloat(document.getElementById('soc').value || '80');
@@ -423,3 +429,109 @@ window.addStop = function(id){
   if(typeof _oldAddStop === 'function'){ _oldAddStop(id); }
   selectCharger(id);
 };
+
+// --- Platform-native emojis on labels ---
+(function(){
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isAndroid = /Android/.test(navigator.userAgent);
+  // We rely on native emoji rendering (auto-adapts). Here we just choose relevant symbols.
+  const icon = (ios, android)=> ios; // same codepoints, but left hook kept if we later diverge
+  const labelMap = {
+    "Départ": "🧭",
+    "Arrivée": "📍",
+    "Capacité (kWh)": "🔋",
+    "SoC actuel (%)": "⚡",
+    "Conso (kWh/100km)": "📊",
+    "Réserve (%)": "🛟",
+    "% min à l’arrivée BORNE": "⛽",
+    "% min à l’arrivée TRAJET": "🎯",
+    "Immatriculation (ex: AB-123-CD)": "🚗"
+  };
+  document.querySelectorAll('label').forEach(l=>{
+    const t = l.textContent.trim();
+    if(labelMap[t]) l.innerHTML = `${t} <span aria-hidden="true">${labelMap[t]}</span>`;
+  });
+})();
+
+// --- Auto-optimal stop selection ---
+// Compute minimal total time (simple model): detour distance penalty + charging time.
+// Detour penalty approximated by nearest point distance to route * 2 (in/out), with avg speed 90 km/h.
+function nearestDistanceToRoute(charger, route){
+  let min = Infinity;
+  for(const p of route.geometry){
+    const d = haversine(p.lat, p.lng, charger.lat, charger.lng);
+    if(d < min) min = d;
+  }
+  return min; // km
+}
+
+function avgSpeedKmh(){ return 90; } // crude default for highway mix
+
+async function chooseOptimalStop(){
+  if(!window.lastRoute){ toast('Trace un itinéraire d’abord.'); return; }
+  const minAtCharger = parseFloat(document.getElementById('minAtCharger').value||'10');
+  const minAtArrival = parseFloat(document.getElementById('minAtArrival').value||'10');
+  const {cap, soc, cons, reserve, carKw} = vehicleSpec();
+  const dist = window.lastRoute.distance_km;
+
+  // Energy needed for whole trip with arrival buffer
+  const totalArrivalLimitPct = Math.max(reserve, minAtArrival);
+  const totalUsable_kWh = cap * Math.max(0, (soc - totalArrivalLimitPct)/100);
+  const energyTrip_kWh = dist * cons / 100;
+
+  // If you can already make it, pick fastest/highest power close to route as optional (0 min)
+  if(totalUsable_kWh >= energyTrip_kWh){
+    const near = chargers.map(c=>({...c, off: nearestDistanceToRoute(c, window.lastRoute)}))
+                         .sort((a,b)=> (a.off - b.off) || (b.power - a.power))[0];
+    selectCharger(near.id);
+    return;
+  }
+
+  // Otherwise evaluate candidates within 10 km of route
+  const candidates = chargers.map(c=>{
+    const off = nearestDistanceToRoute(c, window.lastRoute);
+    if(off > 10) return null;
+    // Estimate charging time if stopping here
+    const stationKw = c.power || 100;
+    const peakKw = Math.min(stationKw, carKw);
+    const avgKw = Math.max(20, peakKw * (settings?.taper || 0.60));
+
+    // Energy available before reaching charger (up to minAtCharger)
+    // Assume we reach it while staying above minAtCharger constraint -> if not possible, penalize heavily
+    // Distance to charger along route unknown; using mid-route proxy is ok for demo
+    const mid = window.lastRoute.geometry[Math.floor(window.lastRoute.geometry.length/2)];
+    const distToCharger_km = haversine(mid.lat, mid.lng, c.lat, c.lng) + dist*0.25; // rough proxy
+    const energyBeforeStop_kWh = cap * Math.max(0,(soc - Math.max(reserve, minAtCharger))/100);
+    const reachable_km = (energyBeforeStop_kWh / cons) * 100;
+    const reachPenaltyMin = (reachable_km + 1 < distToCharger_km) ? 9999 : 0;
+
+    // Energy missing after stop to finish with arrival buffer
+    const missing_kWh = Math.max(0, energyTrip_kWh - totalUsable_kWh) * 1.08;
+    const chargeMin = Math.round((missing_kWh / avgKw) * 60);
+
+    const detourKm = off * 2; // in+out
+    const detourMin = (detourKm / avgSpeedKmh()) * 60;
+
+    const totalMin = reachPenaltyMin + detourMin + chargeMin;
+    return {...c, off, detourKm, chargeMin, totalMin};
+  }).filter(Boolean).sort((a,b)=> a.totalMin - b.totalMin);
+
+  if(!candidates.length){ toast('Aucune borne proche de la route.'); return; }
+  const best = candidates[0];
+  // Center, add stop, estimate
+  centerOn(best.lat, best.lng);
+  addStop(best.id); // this will also select + estimate
+}
+
+(function addAutoStopUI(){
+  // Add an "Arrêt auto optimal" button at top of chargers panel
+  const head = document.getElementById('chargersHeader');
+  if(!head) return;
+  const btn = document.createElement('button');
+  btn.className = 'accent';
+  btn.textContent = '✨ Arrêt auto optimal';
+  btn.onclick = chooseOptimalStop;
+  const right = document.createElement('div');
+  right.style.display='flex'; right.style.gap='8px'; right.appendChild(btn);
+  head.appendChild(right);
+})();

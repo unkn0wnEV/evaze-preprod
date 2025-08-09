@@ -1,4 +1,4 @@
-/* EVaze – v0.4.1 in-flow chargers panel + settings */
+/* EVaze – v0.4.3 style polish + auto-stop */
 :root{
   --bg:#0f141a;
   --panel:#131a22;
@@ -10,7 +10,6 @@
   --accent-2:#00d98b;
   --warning:#ffb020;
   --danger:#ff5b5b;
-  --safe-bottom: max(env(safe-area-inset-bottom), 12px);
 }
 
 *{box-sizing:border-box}
@@ -27,14 +26,14 @@ h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
 .panel{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;margin:0 0 12px 0;
   box-shadow:0 8px 24px rgba(0,0,0,.25)}
 .panel h2{margin:0 0 10px 0;font-size:16px;font-weight:700}
-.panel label{font-size:12px;color:var(--muted)}
-input{width:100%;margin:6px 0 10px 0;padding:10px 12px;border-radius:12px;border:1px solid var(--border);
+.panel label{font-size:12px;color:var(--muted);display:block;margin-top:2px}
+input{width:100%;margin:6px 0 10px 0;padding:12px;border-radius:12px;border:1px solid var(--border);
   background:#0b0f15;color:#eaf2fb;outline:none}
 input:focus{border-color:#2f3d4d;box-shadow:0 0 0 3px rgba(45,160,255,.15)}
 .small{font-size:12px;color:var(--muted)}
 
-button{padding:10px 14px;border:1px solid var(--border);border-radius:999px;background:#0f1721;color:var(--text);
-  cursor:pointer;font-weight:600;transition:.15s;letter-spacing:.2px}
+button{padding:12px 16px;border:1px solid var(--border);border-radius:14px;background:#0f1721;color:var(--text);
+  cursor:pointer;font-weight:700;transition:.15s;letter-spacing:.2px}
 button:hover{transform:translateY(-1px);background:#131d29}
 button.accent{background:var(--accent);border-color:transparent;color:#00111d}
 button.accent:hover{filter:brightness(1.05)}
@@ -49,11 +48,19 @@ button.ghost{background:transparent}
 .report:hover{background:#122234}
 
 .app-layout{display:block}
-.map-wrap{position:relative;margin:0}
-#map{width:100%;height:52svh}
+.map-section{margin:12px}
+.map-wrap{position:relative;border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#map{width:100%;height:52svh;display:none}
 @media (min-width:768px){ #map{height:62svh} }
 
-/* Chargers panel in flow */
+/* Recenter bar: iOS-like, icon+label */
+.map-actions{margin-top:8px}
+.map-actions button{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
+  border-radius:16px;box-shadow:0 10px 24px rgba(0,0,0,.3);
+}
+
+/* Chargers panel */
 #chargersPanel{margin:12px;padding:0;background:#0b0f15;border-top:1px solid var(--border);border-radius:14px;overflow:hidden}
 #chargersHeader{position:sticky;top:0;background:#0b0f15;border-bottom:1px solid var(--border);padding:10px 12px;display:flex;justify-content:space-between;align-items:center}
 #chargersList{max-height:60svh;overflow:auto;padding:12px}
@@ -62,17 +69,9 @@ button.ghost{background:transparent}
 #planSummary{margin-top:8px;color:var(--muted)}
 .status{font-size:12px;color:var(--muted)}
 
-.map-controls{position:absolute;right:12px;bottom:12px;z-index:50}
-.map-controls button{box-shadow:0 10px 24px rgba(0,0,0,.35)}
-
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-bottom) + 52px);z-index:1000;background:#101826;
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:52px;z-index:1000;background:#101826;
   border:1px solid var(--border);padding:10px 14px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35);display:none}
 .toast.show{display:block;animation:fade .2s ease-out}
 @keyframes fade{from{opacity:.5;transform:translateX(-50%) translateY(6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
 a{color:#9bcfff;text-decoration:none}
-
-/* Settings modal */
-#settingsModal{display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.5);align-items:center;justify-content:center}
-#settingsCard{background:#131a22;border:1px solid var(--border);border-radius:14px;max-width:560px;width:92%;padding:14px}
-#settingsCard h3{margin:0 0 8px 0}
