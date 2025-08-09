@@ -1,10 +1,6 @@
 // EVaze preprod – Waze-like styling + improved planner UX
 
 const map = L.map('map').setView([46.6, 2.5], 6);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-  attribution: '&copy; OpenStreetMap'
-}).addTo(map);
 
 let startMarker = null, endMarker = null, clickedLatLng = null;
 let routeLine = null;
@@ -66,23 +62,45 @@ async function ensureMarkersFromInputs(){
 async function makeRoute(){
   if(!startMarker || !endMarker) return null;
   const s = startMarker.getLatLng(), e = endMarker.getLatLng();
-  const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if(!data.routes || !data.routes[0]) return null;
-  const route = data.routes[0];
-  if(routeLine) map.removeLayer(routeLine);
-  document.getElementById('map').style.display='block';
-  setTimeout(()=> map.invalidateSize(), 100);
-  routeLine = L.geoJSON(route.geometry, {style:{weight:6, opacity:.9}}).addTo(map);
-  map.fitBounds(routeLine.getBounds());
-  window.lastRoute = {
-    distance_km: route.distance/1000.0,
-    geometry: route.geometry.coordinates.map(([lng,lat])=>({lat, lng}))
-  };
-  document.getElementById('planSummary').innerHTML = `Distance: ${window.lastRoute.distance_km.toFixed(1)} km`;
-  listChargersNearRoute(window.lastRoute);
-  return window.lastRoute;
+  const stops = (typeof selectedStops!=='undefined' ? selectedStops : []).map(id=>{
+    const c = chargers.find(x=>x.id===id); return `${c.lng},${c.lat}`;
+  }).join(';');
+  const coords = `${s.lng},${s.lat}` + (stops?`;${stops}`:'') + `;${e.lng},${e.lat}`;
+  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=true&alternatives=false`;
+
+  // skeleton while loading
+  const list = document.getElementById('chargersList');
+  list.innerHTML = '<div class="card skeleton" style="height:48px"></div><div class="card skeleton" style="height:48px"></div><div class="card skeleton" style="height:48px"></div>';
+
+  try{
+    const data = await fetchJSONWithRetry(url, {retries:3, timeoutMs:8000});
+    if(!data.routes || !data.routes[0]) throw new Error('no route');
+    const route = data.routes[0];
+    if(routeLine) map.removeLayer(routeLine);
+    routeLine = L.geoJSON(route.geometry, {style:{weight:6, opacity:.9}}).addTo(map);
+    map.fitBounds(routeLine.getBounds());
+    window.lastRoute = {
+      distance_km: route.distance/1000.0,
+      geometry: route.geometry.coordinates.map(([lng,lat])=>({lat, lng}))
+    };
+    // Steps
+    const steps = [];
+    try{
+      route.legs.forEach(leg=> leg.steps.forEach(st=> steps.push({name: st.name, distance: st.distance, maneuver: st.maneuver?.type})));
+    }catch(e){}
+    showSteps(steps);
+    listChargersNearRoute(window.lastRoute);
+    document.getElementById('map').style.display='block';
+    setTimeout(()=> map.invalidateSize(), 100);
+    return window.lastRoute;
+  }catch(e){
+    document.getElementById('map').style.display='none';
+    list.innerHTML = '<div class="card">❌ Itinéraire indisponible (réseau saturé). <button id="retryRoute">Réessayer</button></div>';
+    const btn = document.getElementById('retryRoute');
+    if(btn) btn.onclick = ()=> { document.getElementById('planSummary').textContent='Nouvelle tentative…'; makeRoute(); };
+    toast('Erreur de calcul itinéraire (réessaie)');
+    return null;
+  }
 }
 
 // UI handlers
@@ -108,6 +126,7 @@ document.getElementById('geocodeEnd').onclick = async ()=>{
 };
 
 document.getElementById('routeBtn').onclick = async ()=>{
+  document.getElementById('planSummary').textContent = 'Calcul de l’itinéraire…';
   await ensureMarkersFromInputs();
   if(!startMarker || !endMarker){ toast('Renseigne départ et arrivée.'); return; }
   document.getElementById('planSummary').textContent = 'Calcul de l’itinéraire…';
@@ -128,6 +147,7 @@ document.getElementById('clearBtn').onclick = ()=>{
 };
 
 document.getElementById('planBtn').onclick = async ()=>{
+  document.getElementById('planSummary').textContent = 'Analyse en cours…';
   document.getElementById('planSummary').textContent = 'Analyse autonomie en cours…';
   if(!window.lastRoute){
     await ensureMarkersFromInputs();
@@ -647,3 +667,47 @@ function onGeo(pos){
   }
   document.getElementById('hudNext').textContent = next;
 }
+
+async function fetchJSONWithRetry(url, {retries=3, timeoutMs=8000}={}){
+  for(let i=0;i<retries;i++){
+    try{
+      const ctrl = new AbortController();
+      const to = setTimeout(()=> ctrl.abort(), timeoutMs);
+      const res = await fetch(url, {signal: ctrl.signal});
+      clearTimeout(to);
+      if(res.ok){ return await res.json(); }
+    }catch(e){ /* retry */ }
+    await new Promise(r=> setTimeout(r, 500*(i+1)));
+  }
+  throw new Error('Network/route error');
+}
+
+function showSteps(steps){
+  const panel = document.getElementById('stepsPanel');
+  const list = document.getElementById('stepsList');
+  if(!steps || !steps.length){ panel.style.display='none'; list.innerHTML=''; return; }
+  panel.style.display='block';
+  list.innerHTML='';
+  steps.forEach(s=>{
+    const div = document.createElement('div');
+    div.className='step';
+    div.innerHTML = `➡️ <div><b>${s.name||s.maneuver||'Étape'}</b><br><span class="small">${(s.distance/1000).toFixed(1)} km</span></div>`;
+    list.appendChild(div);
+  });
+}
+
+let baseLayer = null, darkLayer = null, usingDark=false;
+(function setupTiles(){
+  // replace default OSM layer with variable handle
+  if(baseLayer) { map.removeLayer(baseLayer); }
+  baseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, attribution:'&copy; OpenStreetMap'}).addTo(map);
+  darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {maxZoom: 19, attribution:'&copy; OpenStreetMap, &copy; Carto'});
+  const toggle = document.getElementById('toggleTiles');
+  if(toggle){
+    toggle.onclick = ()=>{
+      usingDark = !usingDark;
+      if(usingDark){ map.removeLayer(baseLayer); darkLayer.addTo(map); toggle.textContent='☀️ Carte'; }
+      else { map.removeLayer(darkLayer); baseLayer.addTo(map); toggle.textContent='🌙 Carte'; }
+    };
+  }
+})();

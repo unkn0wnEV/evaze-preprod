@@ -1,4 +1,4 @@
-/* EVaze – v0.4.4 multi-stops + live HUD */
+/* EVaze – v0.4.5 routing fix + HUD + steps + dark tiles */
 :root{
   --bg:#0f141a;
   --panel:#131a22;
@@ -53,7 +53,7 @@ button.ghost{background:transparent}
 #map{width:100%;height:52svh;display:none}
 @media (min-width:768px){ #map{height:62svh} }
 
-/* Live HUD */
+/* HUD */
 #liveHud{display:none;margin:8px 12px 0 12px;background:#0b0f15;border:1px solid var(--border);border-radius:14px;padding:8px 12px;
   display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .hud-item{display:flex;gap:6px;align-items:center}
@@ -63,7 +63,11 @@ button.ghost{background:transparent}
 .map-actions{margin:8px 12px 0 12px}
 .map-actions button{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;border-radius:16px;box-shadow:0 10px 24px rgba(0,0,0,.3);}
 
-/* Chargers panel */
+/* Steps list */
+#stepsPanel{margin:12px;background:#0b0f15;border:1px solid var(--border);border-radius:14px;padding:8px 12px;display:none}
+#stepsList{display:grid;gap:6px}
+.step{display:flex;gap:8px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:10px;background:#0e141c}
+
 #chargersPanel{margin:12px;padding:0;background:#0b0f15;border-top:1px solid var(--border);border-radius:14px;overflow:hidden}
 #chargersHeader{position:sticky;top:0;background:#0b0f15;border-bottom:1px solid var(--border);padding:10px 12px;display:flex;justify-content:space-between;align-items:center}
 #chargersList{max-height:60svh;overflow:auto;padding:12px}
@@ -80,5 +84,8 @@ button.ghost{background:transparent}
   border:1px solid var(--border);padding:10px 14px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35);display:none}
 .toast.show{display:block;animation:fade .2s ease-out}
 @keyframes fade{from{opacity:.5;transform:translateX(-50%) translateY(6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+.skeleton{background:linear-gradient(90deg,#111826 0,#151d2a 50%,#111826 100%);background-size:200% 100%;animation:sk 1.2s infinite}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
 a{color:#9bcfff;text-decoration:none}
