@@ -18,7 +18,7 @@
   <div class="status">
     <span id="onlineStatus"></span>
   </div>
-  <div class="status"><span class="badge">v0.4.3-preprod</span> build 2025-08-09 10:25</div>
+  <div class="status"><span class="badge">v0.4.4-preprod</span> build 2025-08-09 10:33</div>
 </header>
 
 
@@ -51,7 +51,7 @@
       <label>Réserve (%)</label><input id="reserve" type="number" min="5" max="30" step="1" value="10"/>
     </div>
     <button id="planBtn" class="accent">Calculer le plan</button>
-    <div id="planSummary"></div>
+    <div id="planSummary"></div><div class="pills" id="stopsPills"></div>
   </div>
 
   <div class="panel">
@@ -68,7 +68,7 @@
   </div>
 </section>
 
-<section class="map-section">  <div class="map-wrap"><div id="map"></div></div>  <div class="map-actions"><button id="recenter" class="accent">📍 Recentrer la carte</button></div></section>
+<div id="liveHud">  <div class="hud-item">🗺️ <b id="hudNext">Prêt</b></div>  <div class="hud-item">⏱️ <span id="hudEta">--</span></div>  <div class="hud-item">📏 <span id="hudRemain">--</span></div>  <div class="hud-cta"><button id="startTrip" class="accent">Démarrer</button><button id="stopTrip">Stop</button></div></div><section class="map-section">  <div class="map-wrap"><div id="map"></div></div>  <div class="map-actions"><button id="recenter" class="accent">📍 Recentrer la carte</button></div></section>
 
 <section id="chargersPanel"><div id="chargersHeader"><h2 style="margin:0">Bornes le long de la route</h2><div class="small">Tire pour scroller</div></div><div id="chargersList"></div></section><div id="bottomTitle"><h2 style="margin:0">Bornes le long de la route</h2><div><button id="collapseSheet" class="ghost">▼</button> <button id="expandSheet" class="ghost">▲</button></div></div><div id="chargersList"></div></div>
 

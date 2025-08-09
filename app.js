@@ -16,7 +16,15 @@ const chargers = [
   {id:'ionity_aire_bois', name:'Ionity Aire du Bois', lat:47.022, lng:2.668, power:350, operator:'Ionity', price:'0.69€/kWh', status:'OPERATIONAL'},
   {id:'fastned_a7_n', name:'Fastned A7 Nord', lat:45.861, lng:4.736, power:300, operator:'Fastned', price:'0.59€/kWh', status:'OPERATIONAL'},
   {id:'tesla_macon', name:'Supercharger Mâcon', lat:46.296, lng:4.828, power:250, operator:'Tesla', price:'0.40–0.54€/kWh', status:'OPERATIONAL'},
-  {id:'total_val', name:'TotalEnergies Val', lat:46.083, lng:4.69, power:180, operator:'TotalEnergies', price:'0.55€/kWh', status:'OPERATIONAL'},
+  {id:'total_val', name:'TotalEnergies Val', lat:46.083, lng:4.690, power:180, operator:'TotalEnergies', price:'0.55€/kWh', status:'OPERATIONAL'},
+  {id:'ionity_orleans', name:'Ionity Orléans Saran', lat:47.950, lng:1.884, power:350, operator:'Ionity', price:'0.69€/kWh', status:'OPERATIONAL'},
+  {id:'fastned_a10', name:'Fastned A10 Touraine', lat:47.167, lng:0.642, power:300, operator:'Fastned', price:'0.59€/kWh', status:'OPERATIONAL'},
+  {id:'tesla_bourg', name:'Supercharger Bourg-en-Bresse', lat:46.199, lng:5.228, power:250, operator:'Tesla', price:'0.40–0.54€/kWh', status:'OPERATIONAL'},
+  {id:'ionity_lyon', name:'Ionity Lyon Dardilly', lat:45.810, lng:4.760, power:350, operator:'Ionity', price:'0.69€/kWh', status:'OPERATIONAL'},
+  {id:'total_chartres', name:'TotalEnergies Chartres', lat:48.467, lng:1.482, power:180, operator:'TotalEnergies', price:'0.55€/kWh', status:'OPERATIONAL'},
+  {id:'allego_a6', name:'Allego A6 Auxerre', lat:47.800, lng:3.574, power:300, operator:'Allego', price:'0.65€/kWh', status:'OPERATIONAL'},
+  {id:'fastned_a71', name:'Fastned A71 Bourges', lat:47.080, lng:2.390, power:300, operator:'Fastned', price:'0.59€/kWh', status:'OPERATIONAL'},
+  {id:'tesla_chalon', name:'Supercharger Chalon-sur-Saône', lat:46.790, lng:4.852, power:250, operator:'Tesla', price:'0.40–0.54€/kWh', status:'OPERATIONAL'}
 ];
 
 const chargerMarkers = {};
@@ -103,7 +111,7 @@ document.getElementById('routeBtn').onclick = async ()=>{
   await ensureMarkersFromInputs();
   if(!startMarker || !endMarker){ toast('Renseigne départ et arrivée.'); return; }
   document.getElementById('planSummary').textContent = 'Calcul de l’itinéraire…';
-  const r = await makeRoute();
+  selectedStops=[]; renderStopsPills(); const r = selectedStops=[]; renderStopsPills(); await makeRoute();
   document.getElementById('map').style.display='block';
   setTimeout(()=> map.invalidateSize(), 100);
   if(!r){ toast('Pas de route trouvée.'); }
@@ -124,7 +132,7 @@ document.getElementById('planBtn').onclick = async ()=>{
   if(!window.lastRoute){
     await ensureMarkersFromInputs();
     if(!startMarker || !endMarker){ toast('Trace d’abord un itinéraire.'); document.getElementById('planSummary').textContent=''; return; }
-    await makeRoute();
+    selectedStops=[]; renderStopsPills(); await makeRoute();
   document.getElementById('map').style.display='block';
   setTimeout(()=> map.invalidateSize(), 100);
   }
@@ -166,7 +174,7 @@ function listChargersNearRoute(r){
     card.innerHTML = `<b>${c.name}</b> <span class="badge">${c.dist.toFixed(1)} km</span><br>
     ${c.operator} • ${c.power} kW • ${c.price}<br>
     <button onclick="centerOn(${c.lat}, ${c.lng})">Voir</button>
-    <button onclick="addStop('${c.id}')" class="accent">Choisir pour ce trajet</button>`;
+    <button onclick="addStop('${c.id}')" class="accent">Ajouter comme arrêt</button>`;
     list.appendChild(card);
   });
 }
@@ -535,3 +543,107 @@ async function chooseOptimalStop(){
   right.style.display='flex'; right.style.gap='8px'; right.appendChild(btn);
   head.appendChild(right);
 })();
+
+let selectedStops = [];
+
+function renderStopsPills(){
+  const box = document.getElementById('stopsPills');
+  box.innerHTML='';
+  selectedStops.forEach((id, idx)=>{
+    const c = chargers.find(x=>x.id===id);
+    if(!c) return;
+    const d = document.createElement('div');
+    d.className='pill';
+    d.innerHTML = `${idx+1}. ${c.operator} ${c.power}kW <button onclick="removeStop('${id}')">✕</button>`;
+    box.appendChild(d);
+  });
+}
+
+window.removeStop = function(id){
+  selectedStops = selectedStops.filter(s=>s!==id);
+  renderStopsPills();
+  recomputeRouteWithStops();
+};
+
+const _oldAddStop_multi = window.addStop;
+window.addStop = function(id){
+  if(!_oldAddStop_multi) { console.warn('addStop base missing'); }
+  if(!selectedStops.includes(id)) selectedStops.push(id);
+  renderStopsPills();
+  recomputeRouteWithStops();
+  const c = chargers.find(x=>x.id===id);
+  if(c) toast(`Arrêt ajouté: ${c.name}`);
+};
+
+async function recomputeRouteWithStops(){
+  if(!startMarker || !endMarker){ return; }
+  const s = startMarker.getLatLng(), e = endMarker.getLatLng();
+  // Build waypoints string: start ; stops... ; end
+  const stops = selectedStops.map(id=>{
+    const c = chargers.find(x=>x.id===id); return `${c.lng},${c.lat}`;
+  }).join(';');
+  const coords = `${s.lng},${s.lat}` + (stops?`;${stops}`:'') + `;${e.lng},${e.lat}`;
+  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if(!data.routes || !data.routes[0]) { toast('Route non trouvée'); return; }
+  const route = data.routes[0];
+  if(routeLine) map.removeLayer(routeLine);
+  routeLine = L.geoJSON(route.geometry, {style:{weight:6, opacity:.9}}).addTo(map);
+  map.fitBounds(routeLine.getBounds());
+  window.lastRoute = {
+    distance_km: route.distance/1000.0,
+    geometry: route.geometry.coordinates.map(([lng,lat])=>({lat, lng}))
+  };
+  listChargersNearRoute(window.lastRoute);
+  document.getElementById('map').style.display='block';
+  setTimeout(()=> map.invalidateSize(), 100);
+}
+
+let watchId = null;
+function startLive(){
+  if(!window.lastRoute){ toast('Trace un itinéraire.'); return; }
+  const hud = document.getElementById('liveHud');
+  hud.style.display='flex';
+  if(navigator.geolocation){
+    watchId = navigator.geolocation.watchPosition(onGeo, err=>toast('Géoloc indisponible'), {enableHighAccuracy:true, maximumAge:5000, timeout:10000});
+  }else{
+    toast('Géoloc non supportée');
+  }
+}
+function stopLive(){
+  if(watchId){ navigator.geolocation.clearWatch(watchId); watchId=null; }
+  document.getElementById('liveHud').style.display='none';
+}
+document.getElementById('startTrip').onclick = startLive;
+document.getElementById('stopTrip').onclick = stopLive;
+
+function onGeo(pos){
+  const {latitude, longitude} = pos.coords;
+  // Snap to nearest point on route (simple nearest)
+  let nearest = null, min = Infinity, idx=0, iBest=0;
+  for(const p of window.lastRoute.geometry){
+    const d = haversine(latitude, longitude, p.lat, p.lng);
+    if(d<min){ min=d; nearest=p; iBest=idx; }
+    idx++;
+  }
+  // Remaining distance from nearest index to end
+  let remain = 0;
+  for(let i=iBest;i<window.lastRoute.geometry.length-1;i++){
+    const a = window.lastRoute.geometry[i], b = window.lastRoute.geometry[i+1];
+    remain += haversine(a.lat,a.lng,b.lat,b.lng);
+  }
+  const speed = pos.coords.speed ? Math.max(0,pos.coords.speed*3.6) : 90; // km/h
+  const etaMin = Math.round(remain / Math.max(10,speed) * 60);
+  document.getElementById('hudEta').textContent = etaMin + ' min';
+  document.getElementById('hudRemain').textContent = remain.toFixed(1) + ' km';
+  // Next stop label
+  let next = 'Destination';
+  for(const id of selectedStops){
+    const c = chargers.find(x=>x.id===id);
+    // crude: if distance to charger from here along route less than total remain/2, assume next
+    const dTo = haversine(latitude, longitude, c.lat, c.lng);
+    if(dTo < remain/2){ next = c.name; break; }
+  }
+  document.getElementById('hudNext').textContent = next;
+}
