@@ -1,0 +1,61 @@
+/* EVaze – Waze-like dark theme */
+:root{
+  --bg:#0f141a;
+  --panel:#131a22;
+  --panel-2:#0e1218;
+  --border:#1f2a36;
+  --text:#eaf2fb;
+  --muted:#a8b5c3;
+  --accent:#2da0ff;     /* Waze-ish blue */
+  --accent-2:#00d98b;   /* success green */
+  --warning:#ffb020;
+  --danger:#ff5b5b;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,sans-serif;
+  background:var(--bg);color:var(--text)}
+
+header{position:sticky;top:0;z-index:10;display:flex;gap:10px;align-items:center;justify-content:space-between;
+  padding:10px 16px;background:linear-gradient(180deg,#0f151d, #0c1117);border-bottom:1px solid var(--border)}
+h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
+.badge{display:inline-block;padding:3px 8px;border:1px solid var(--border);border-radius:999px;margin-left:6px;font-size:11px;color:var(--muted)}
+
+#controls{display:flex;gap:12px;flex-wrap:wrap;padding:12px;background:var(--panel-2);border-bottom:1px solid var(--border)}
+
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;min-width:280px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.panel h2{margin:0 0 10px 0;font-size:15px;font-weight:700}
+.panel label{font-size:12px;color:var(--muted)}
+input{width:100%;margin:6px 0 10px 0;padding:10px 12px;border-radius:12px;border:1px solid var(--border);
+  background:#0b0f15;color:var(--text);outline:none}
+input:focus{border-color:#2f3d4d;box-shadow:0 0 0 3px rgba(45,160,255,.15)}
+
+button{padding:10px 14px;border:1px solid var(--border);border-radius:999px;background:#0f1721;color:var(--text);
+  cursor:pointer;font-weight:600;transition:.15s;letter-spacing:.2px}
+button:hover{transform:translateY(-1px);background:#131d29}
+button.accent{background:var(--accent);border-color:transparent;color:#00111d}
+button.accent:hover{filter:brightness(1.05)}
+button.ghost{background:transparent}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+.report-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.report{background:#0f1a25;border-color:#1e2a3a}
+.report:hover{background:#122234}
+
+#map{position:fixed;top:206px;bottom:0;left:0;right:340px}
+#sidebar{position:fixed;top:206px;right:0;bottom:0;width:340px;overflow:auto;background:#0b0f15;border-left:1px solid var(--border);padding:12px}
+#chargersList .card, #reportsList .card{border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:10px;background:#0e141c}
+#planSummary{margin-top:8px;color:var(--muted)}
+.status{font-size:12px;color:var(--muted)}
+
+.fab{position:fixed;bottom:16px;left:16px;z-index:999}
+.fab button{box-shadow:0 10px 24px rgba(0,0,0,.35)}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:1000;background:#101826;
+  border:1px solid var(--border);padding:10px 14px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35);display:none}
+.toast.show{display:block;animation:fade .2s ease-out}
+@keyframes fade{from{opacity:.5;transform:translateX(-50%) translateY(6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+a{color:#9bcfff;text-decoration:none}

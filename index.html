@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="theme-color" content="#2da0ff"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EVaze – Préprod</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<header>
+  <h1>EVaze – Préprod <span class="badge">dark mode</span></h1>
+  <div class="status">
+    <span id="onlineStatus"></span>
+  </div>
+  <div class="status"><span class="badge">v0.3.0-preprod</span> build 2025-08-09 09:25</div>
+</header>
+
+<section id="controls">
+  <div class="panel">
+    <h2>Itinéraire</h2>
+    <label>Départ</label>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="start" placeholder="Ex: Paris, France" />
+      <button id="geocodeStart" class="ghost">📍</button>
+    </div>
+    <label>Arrivée</label>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="end" placeholder="Ex: Lyon, France" />
+      <button id="geocodeEnd" class="ghost">📍</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="routeBtn" class="accent">Tracer l'itinéraire</button>
+      <button id="clearBtn">Effacer</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Véhicule</h2>
+    <div class="grid">
+      <label>Capacité (kWh)</label><input id="capacity" type="number" min="10" max="150" step="1" value="50"/>
+      <label>SoC actuel (%)</label><input id="soc" type="number" min="1" max="100" step="1" value="80"/>
+      <label>Conso (kWh/100km)</label><input id="consumption" type="number" min="8" max="30" step="0.1" value="15.0"/>
+      <label>Réserve (%)</label><input id="reserve" type="number" min="5" max="30" step="1" value="10"/>
+    </div>
+    <button id="planBtn" class="accent">Calculer le plan</button>
+    <div id="planSummary"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Signaler</h2>
+    <div class="report-row">
+      <button class="report" data-type="police">👮 Police</button>
+      <button class="report" data-type="radar">📸 Radar</button>
+      <button class="report" data-type="accident">⚠️ Accident</button>
+      <button class="report" data-type="borne_hs">🔌 Borne HS</button>
+      <button class="report" data-type="file_attente">⏳ File d'attente</button>
+    </div>
+    <small>Astuce : cliquez sur la carte pour choisir l’emplacement, puis sur un bouton.</small>
+    <div id="reportsList"></div>
+  </div>
+</section>
+
+<div id="map"></div>
+
+<div id="sidebar">
+  <h2>Bornes le long de la route</h2>
+  <div id="chargersList"></div>
+</div>
+
+<div class="fab">
+  <button id="recenter" class="accent">📍 Recentrer</button>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+
+<div id="aboutModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;align-items:center;justify-content:center">
+  <div style="background:#131a22;border:1px solid #1f2a36;border-radius:14px;max-width:520px;width:92%;padding:16px">
+    <h2 style="margin:0 0 8px 0">À propos</h2>
+    <p>EVaze – Prototype préprod pour tests iPhone. Mode PWA installable.</p>
+    <ul>
+      <li>0.3.0 – PWA, cache offline, toasts, auto-route dans le plan.</li>
+      <li>0.2.0 – Thème Waze-like, corrections UX.</li>
+      <li>0.1.0 – Prototype initial.</li>
+    </ul>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button onclick="document.getElementById('aboutModal').style.display='none'">Fermer</button>
+    </div>
+  </div>
+</div>
+<script>
+  // SW registration
+  if('serviceWorker' in navigator){{
+    window.addEventListener('load', ()=> navigator.serviceWorker.register('./service-worker.js'));
+  }}
+  // About shortcut
+  document.addEventListener('keydown', e=>{{ if(e.key==='?') document.getElementById('aboutModal').style.display='flex'; }});
+</script>
+
+</body>
+</html>
