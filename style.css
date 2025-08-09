@@ -1,4 +1,4 @@
-/* EVaze – v0.4.0 bottom sheet + charge time */
+/* EVaze – v0.4.1 in-flow chargers panel + settings */
 :root{
   --bg:#0f141a;
   --panel:#131a22;
@@ -29,8 +29,9 @@ h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
 .panel h2{margin:0 0 10px 0;font-size:16px;font-weight:700}
 .panel label{font-size:12px;color:var(--muted)}
 input{width:100%;margin:6px 0 10px 0;padding:10px 12px;border-radius:12px;border:1px solid var(--border);
-  background:#0b0f15;color:var(--text);outline:none}
+  background:#0b0f15;color:#eaf2fb;outline:none}
 input:focus{border-color:#2f3d4d;box-shadow:0 0 0 3px rgba(45,160,255,.15)}
+.small{font-size:12px;color:var(--muted)}
 
 button{padding:10px 14px;border:1px solid var(--border);border-radius:999px;background:#0f1721;color:var(--text);
   cursor:pointer;font-weight:600;transition:.15s;letter-spacing:.2px}
@@ -41,6 +42,7 @@ button.ghost{background:transparent}
 
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media (max-width:560px){ .grid{grid-template-columns:1fr} }
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
 .report-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .report{background:#0f1a25;border-color:#1e2a3a}
@@ -51,22 +53,10 @@ button.ghost{background:transparent}
 #map{width:100%;height:52svh}
 @media (min-width:768px){ #map{height:62svh} }
 
-/* Bottom sheet */
-#bottomSheet{
-  position:fixed;left:0;right:0;bottom:0;z-index:30;
-  background:#0b0f15;border-top:1px solid var(--border);
-  box-shadow:0 -10px 30px rgba(0,0,0,.4);
-  border-top-left-radius:16px;border-top-right-radius:16px;
-  height:40svh;transform:translateY(0);
-  display:flex;flex-direction:column;gap:8px;padding:8px 12px 12px 12px;
-  touch-action:none;
-}
-#bottomSheet.collapsed{height:64px}
-#bottomSheet.full{height:85svh}
-#sheetHandle{align-self:center;width:42px;height:5px;border-radius:999px;background:#30384a;margin:6px 0}
-#bottomTitle{display:flex;align-items:center;justify-content:space-between}
-#chargersList{overflow:auto;flex:1;min-height:0}
-
+/* Chargers panel in flow */
+#chargersPanel{margin:12px;padding:0;background:#0b0f15;border-top:1px solid var(--border);border-radius:14px;overflow:hidden}
+#chargersHeader{position:sticky;top:0;background:#0b0f15;border-bottom:1px solid var(--border);padding:10px 12px;display:flex;justify-content:space-between;align-items:center}
+#chargersList{max-height:60svh;overflow:auto;padding:12px}
 .card{border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:10px;background:#0e141c}
 
 #planSummary{margin-top:8px;color:var(--muted)}
@@ -81,3 +71,8 @@ button.ghost{background:transparent}
 @keyframes fade{from{opacity:.5;transform:translateX(-50%) translateY(6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
 a{color:#9bcfff;text-decoration:none}
+
+/* Settings modal */
+#settingsModal{display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.5);align-items:center;justify-content:center}
+#settingsCard{background:#131a22;border:1px solid var(--border);border-radius:14px;max-width:560px;width:92%;padding:14px}
+#settingsCard h3{margin:0 0 8px 0}
