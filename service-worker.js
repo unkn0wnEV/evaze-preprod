@@ -1,5 +1,5 @@
 // EVaze service worker – cache static assets for offline testing
-const CACHE_NAME = 'evaze-cache-0.3.0-preprod';
+const CACHE_NAME = 'evaze-cache-0.4.6-preprod';
 const ASSETS = [
   './index.html',
   './style.css',
